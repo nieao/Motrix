@@ -1,0 +1,182 @@
+version: '3.8'
+
+# ============================================
+# 金融决策系统 - Docker Compose 配置
+# ============================================
+#
+# 使用方法:
+# 1. 确保 .env 文件已配置
+# 2. 启动所有服务: docker-compose up -d
+# 3. 查看日志: docker-compose logs -f
+# 4. 停止服务: docker-compose down
+#
+# ============================================
+
+services:
+  # ==========================================
+  # Redis - 缓存服务
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: financial-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - financial-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ==========================================
+  # MongoDB - 数据持久化
+  # ==========================================
+  mongodb:
+    image: mongo:6
+    container_name: financial-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE:-financial_db}
+    networks:
+      - financial-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ==========================================
+  # Python AI 服务 - 核心分析引擎
+  # ==========================================
+  financial-service:
+    build:
+      context: ../financial-service
+      dockerfile: Dockerfile
+    container_name: financial-ai-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - mongodb
+    environment:
+      # 数据库连接
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: 27017
+      MONGODB_USERNAME: ${MONGODB_USERNAME:-admin}
+      MONGODB_PASSWORD: ${MONGODB_PASSWORD:-password}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-financial_db}
+
+      # LLM API Keys
+      DASHSCOPE_API_KEY: ${DASHSCOPE_API_KEY}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+
+      # 数据源 API Keys
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      TUSHARE_TOKEN: ${TUSHARE_TOKEN}
+
+      # 应用配置
+      APP_ENV: production
+      DEBUG: ${DEBUG:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+    volumes:
+      - ../financial-service:/app
+      - financial_logs:/app/logs
+      - financial_data:/app/data
+    networks:
+      - financial-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================
+  # MongoDB Express - 数据库管理界面 (可选)
+  # ==========================================
+  mongo-express:
+    image: mongo-express:latest
+    container_name: financial-mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    depends_on:
+      - mongodb
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${MONGODB_USERNAME:-admin}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${MONGODB_PASSWORD:-password}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGODB_USERNAME:-admin}:${MONGODB_PASSWORD:-password}@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin
+    networks:
+      - financial-network
+
+  # ==========================================
+  # Redis Commander - Redis 管理界面 (可选)
+  # ==========================================
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: financial-redis-commander
+    restart: unless-stopped
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    networks:
+      - financial-network
+
+# ==========================================
+# 网络配置
+# ==========================================
+networks:
+  financial-network:
+    driver: bridge
+    name: financial-network
+
+# ==========================================
+# 数据卷配置
+# ==========================================
+volumes:
+  # Redis 数据
+  redis_data:
+    driver: local
+    name: financial_redis_data
+
+  # MongoDB 数据
+  mongo_data:
+    driver: local
+    name: financial_mongo_data
+
+  mongo_config:
+    driver: local
+    name: financial_mongo_config
+
+  # 应用数据
+  financial_logs:
+    driver: local
+    name: financial_logs
+
+  financial_data:
+    driver: local
+    name: financial_data
