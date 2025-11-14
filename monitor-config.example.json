@@ -1,0 +1,59 @@
+{
+  "monitors": {
+    "python": [
+      {
+        "name": "my-python-script",
+        "scriptPath": "/path/to/script.py",
+        "pythonPath": "python3",
+        "args": ["--verbose"],
+        "env": {
+          "DEBUG": "true"
+        },
+        "cwd": "/path/to/working/directory",
+        "autoRestart": true,
+        "maxRestarts": 3,
+        "restartDelay": 5000
+      }
+    ],
+    "browser": [
+      {
+        "name": "my-website",
+        "url": "https://example.com",
+        "headless": true,
+        "width": 1920,
+        "height": 1080,
+        "monitorDom": true,
+        "verbose": false
+      }
+    ]
+  },
+  "reporters": {
+    "console": {
+      "enabled": true,
+      "colors": true,
+      "verbose": false
+    },
+    "file": {
+      "enabled": true,
+      "logDir": "./logs",
+      "logFileName": "monitor.log",
+      "errorLogFileName": "monitor-error.log",
+      "maxFileSize": 10485760,
+      "rotateCount": 5
+    },
+    "html": {
+      "enabled": true,
+      "reportDir": "./reports",
+      "reportFileName": "monitor-report.html",
+      "maxEntries": 1000,
+      "autoSaveInterval": 30000
+    },
+    "notification": {
+      "enabled": true,
+      "notifyErrors": true,
+      "notifyWarnings": false,
+      "minInterval": 5000
+    }
+  },
+  "metricsInterval": 10000
+}
